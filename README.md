@@ -1,5 +1,25 @@
 # placepicker
 
+## Explaining the clickable button pics
+
+The button within your Places component is rendered as part of each place item in the list of places that are either available to visit or have been picked by the user. Specifically, the button is displayed in the following context:
+
+Within a List Item (<li>) of Each Place: Each place from the places array passed to the Places component is listed as an <li> element within an unordered list (<ul>). For each place, a button is created.
+
+Button Content: The button includes:
+
+An <img> element displaying the image of the place, with the src attribute set to the place's image URL (place.image.src) and the alt attribute set to a descriptive text (place.image.alt) for accessibility.
+An <h3> element containing the title of the place (place.title).
+Button's Functionality: When clicked, the button triggers the onSelectPlace function passed as a prop to the Places component. This function is called with the ID of the selected place (place.id) as its argument. Depending on which Places component instance the button is a part of, this could either add the place to the user's picked places (if the button is in the "Available Places" list) or initiate the process to remove a place from the picked places (if the button is in the "I'd like to visit ..." list).
+
+Visual and Structural Context: The button is visually part of a larger list that represents either the places a user has picked to visit or the places that are available to be picked. This list is displayed under a heading (<h2>) that titles the section as either "I'd like to visit ..." or "Available Places", based on the title prop passed to the Places component.
+
+Conditional Rendering Based on Places Availability: The rendering of the button (within its respective place item) is conditional:
+
+If places.length is greater than 0, the list of places (and thus the buttons) is shown.
+If places.length is 0, a fallback text paragraph (<p>), defined by the fallbackText prop, is displayed instead, indicating that there are no places to display.
+In summary, the button from your Places component is displayed as part of a dynamic list of places, either under the "I'd like to visit ..." section for places the user has picked or under the "Available Places" section for places available to pick, each serving different functionalities upon being clicked.
+
 ## Definition of Side-effects
 
 - Side-effects are "tasks" that do not impact the current component render cycle, although they are necessary for the component to render correctly
@@ -36,6 +56,8 @@
 - useEffect deals with this problem
 
 ### useEffect
+
+#### How to use useEffect
 
 - import useEffect
 - execute it inside the component function just like any other hook
@@ -112,3 +134,143 @@ Removing an item and storing it:
 - Loading an item from local storage when the App starts
   - This is an example where useEffect is redundant. It is running synchronously with the App because it does not neet to first fetch navigation data. It can therefore be moved outside the App and the useEffect hook should then not be used with it.
   - Update const [pickedPlaces, setPickedPlaces] = useState(storedPlaces); with storedPlaces instead of an empty array and your selected places should load upon reload
+
+#### Showing a modal with useEffect
+
+The direct manipulation of the DOM (dialog.current.showModal(); and dialog.current.close();) outside of the React lifecycle methods (like useEffect) can lead to unintended behaviors or errors.
+
+This code will therefore not render correctly without using useEffect:
+
+```
+import { useRef } from "react";
+import { createPortal } from "react-dom";
+
+function Modal({ open, children }) {
+  const dialog = useRef();
+
+  if (open) {
+    dialog.current.showModal();
+  } else {
+    dialog.current.close();
+  }
+
+  return createPortal(
+    <dialog className="modal" ref={dialog}>
+      {children}
+    </dialog>,
+    document.getElementById("modal")
+  );
+}
+
+export default Modal;
+
+```
+
+This code is a type of side-effect because even though it does have a direct effect on the UI it does not have a direct impact on the jsx code inside the returned createPortal. So it is not directly related to the component's render cycle.
+
+```
+if (open) {
+dialog.current.showModal();
+} else {
+dialog.current.close();
+}
+```
+
+So this code needs to be moved into a useEffect hook.
+
+Here's why useEffect is necessary in this context:
+
+1. React Lifecycle and DOM Manipulation:
+   React's reconciliation process means that direct DOM manipulations might not align with React's virtual DOM updates. Manipulating DOM elements directly in the component body (outside of effects or lifecycle methods) can lead to inconsistencies because these manipulations can be overridden or missed during React's DOM updates.
+
+2. Ref Initialisation:
+   When your component first renders, dialog.current is null because the assignment to the ref happens after the component's output has been committed to the DOM. (At this stage the connection between the dialog and the ref in the CreatePortal has not been established.) Attempting to call .showModal() or .close() directly in the component body will throw an error because dialog.current is not yet assigned.
+
+3. Conditional Logic Based on Props:
+   Using useEffect allows you to correctly respond to changes in props or state. By placing your open/close logic inside a useEffect with open as a dependency, you ensure that:
+
+The modal's open/close state is correctly managed in response to changes in the open prop.
+DOM manipulations occur after the component has been mounted and dialog.current has been assigned.
+Correct Implementation Using useEffect:
+
+```
+import { useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
+
+function Modal({ open, children }) {
+  const dialog = useRef();
+
+  useEffect(() => {
+    if (open) {
+      dialog.current.showModal();
+    } else {
+      dialog.current.close();
+    }
+  }, [open]); // Dependency array with 'open' ensures effect runs when 'open' changes.
+
+  return createPortal(
+    <dialog className="modal" ref={dialog}>
+      {children}
+    </dialog>,
+    document.getElementById("modal-root") // Ensure this is 'modal-root' or the correct ID.
+  );
+}
+
+export default Modal;
+```
+
+The useEffect hook listens for changes to the open prop. When open changes, the effect will run (after the initial run of the component function), safely applying the appropriate DOM manipulation (showModal or close) after the component has mounted and dialog.current is guaranteed to be assigned. It safely established the connection between the dialog and the ref.
+
+useEffect here does not prevent an infinite loop, it synchronise a value (the open prop) to a DOM API or to a certain behaviour.
+
+This approach leverages React's lifecycle to ensure your DOM manipulations are both safe and in sync with React's updates, preventing errors and ensuring the expected behavior of your modal component.
+
+At this point though you will still get a warning when the page renders. This is because all the dependancies required has not been listed in the dependancies array of the useEffect hook.
+
+Other than the previous useEffect examples, this if..code here has dependancies
+
+Depandancies is any value that causes the component function to execute again (like with props and state) if it is used inside useEffect(). Anything build into the browser (like objects and methods like we've seen with navigator) is not concidered dependancies. useEffect() only cares about dependancies that would cause the component function to execute again, because the useEffect() function should run whenever the component function executed, if one of its dependancies changed.
+
+The open prop value will change in this application so it is a dependancy. At this stage you can click on the pics in the application but nothing happens. The modal does not open, because the effect function does not run again - which means that showModal is not called. Therefor you need to add "open" as a dependancy. Whenever the modal function has run or the value of the open prop change the effect function will run now.
+
+Fixing a Small Bug
+The <dialog> element can also be closed by pressing the ESC key on the keyboard. In that case, the dialog will disappear but the state passed to the open prop (i.e., the modalIsOpen state) will not be set to false.
+
+Therefore, the modal can't be opened again (because modalIsOpen still is true - the UI basically now is not in sync with the state anymore).
+
+To fix this issue, we must listen to the modal being closed by adding the built-in onClose prop to the <dialog>. The event is then "forwarded" to the App component by accepting a custom onClose prop on the Modal component.
+
+The Modal component therefore should look like this:
+
+import { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+
+function Modal({ open, children, onClose }) {
+const dialog = useRef();
+
+useEffect(() => {
+if (open) {
+dialog.current.showModal();
+} else {
+dialog.current.close();
+}
+}, [open]);
+
+return createPortal(
+
+<dialog className="modal" ref={dialog} onClose={onClose}>
+{children}
+</dialog>,
+document.getElementById('modal')
+);
+}
+
+export default Modal;
+In the App component, we can now set the handleStopRemovePlace function as a value for the onClose prop on the <Modal> component:
+
+<Modal open={modalIsOpen} onClose={handleStopRemovePlace}>
+  <DeleteConfirmation
+    onCancel={handleStopRemovePlace}
+    onConfirm={handleRemovePlace}
+  />
+</Modal>
