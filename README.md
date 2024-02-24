@@ -54,3 +54,61 @@ useEffect(() => {
 
 - React will execute this function after the first rendering. If any dependancies has been listed, useEffect will only render again if the dependancy values change. In this case where there are no dependancies specified, but only an empty array, react will never again after its first execution executes again. If no dependacy array has been specified at all, then you would be back to a loop because the component would continue rerendering.
 - You can set some fallback text now as a places prop in the return statement to show while the places are being fetched. In your Places module this would render conditionally.
+- It is considered bad practice to use useEffect() unnecessary. It triggers after the first component render session and can be unnecessary.
+- For instance when you want to use localStorage() provided by the browser to remember your selections on a website.
+  localStorage.setItem('selectedPlaces', JSON.stringify([]))
+  - pass an identifyer in quotes
+  - pass a second argument for the value, but convert this first into a string.
+  - but you need to get the local storage id's first as taken in by handleSelectPlaces(id)
+    localStorage.getItem('selectedPlaces') || '[]' which you need to convert back to a js object with the JSON.parse() method (see below)
+  - also provide some fallback code in case no id's has been stored yet (in which case it would yield "undefined"), but now an empty array
+  - upon rendering for the first time with nothing selected and stored yet, the code will attempt to parse and empty string which would not be possible. The empty array [] is therefore enclosed in quotations because JSON.parse() needs to render from a string.
+- save this into a const storedIds that can be spread into an array with the new id placed in front
+  const storedIds = JSON.parse(localStorage.getItem('selectedPlaces') || '[]');
+  localStorage.setItem('selectedPlaces', JSON.stringify([id, ...storedIds]))
+- add a check to see if the id is already stored. If it is not found then run the update code
+
+```
+  function handleSelectPlace(id) {
+    setPickedPlaces((prevPickedPlaces) => {
+      if (prevPickedPlaces.some((place) => place.id === id)) {
+        return prevPickedPlaces;
+      }
+      const place = AVAILABLE_PLACES.find((place) => place.id === id);
+      return [place, ...prevPickedPlaces];
+    });
+
+    const storedIds = JSON.parse(localStorage.getItem('selectedPlaces') || '[]');
+    if (storedIds.indexOf(id) === -1) {
+    localStorage.setItem('selectedPlaces', JSON.stringify([id, ...storedIds]))
+    }
+  }
+```
+
+- This whole storage mechanism is a side-effect. However, not every side-effect needs useEffect()
+  You cannot use useEffect inside a nested function to wrap around this code or use it in if statements etc. They must be used directly inside the root level of the component
+- This side-effect however, does not update any state when the handleSelectPlace onClick event is run. And even if it did update state it would not cause an infinite loop because it run only after its being clicked
+- At this stage local storage wont work upon reload. It first needs to be loaded when the app reloads which it does not do yet. Nether does it update your selected places when items are deleted
+
+Removing an item and storing it:
+
+```
+  function handleRemovePlace() {
+    setPickedPlaces((prevPickedPlaces) => prevPickedPlaces.filter((place) => place.id !== selectedPlace.current));
+    modal.current.close();
+
+    const storedIds = JSON.parse(localStorage.getItem("selectedPlaces") || '[]');
+    localStorage.setItem(
+      "selectedPlaces",
+      JSON.stringify(
+        storedIds.filter((id) => {
+          id !== selectedPlace.current; //selectedPlace is available as a Ref
+        })
+      )
+    );
+  }
+```
+
+- Loading an item from local storage when the App starts
+  - This is an example where useEffect is redundant. It is running synchronously with the App because it does not neet to first fetch navigation data. It can therefore be moved outside the App and the useEffect hook should then not be used with it.
+  - Update const [pickedPlaces, setPickedPlaces] = useState(storedPlaces); with storedPlaces instead of an empty array and your selected places should load upon reload
