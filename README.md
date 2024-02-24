@@ -363,3 +363,76 @@ const handleRemovePlace = useCallback(function handleRemovePlace() {
 ```
 
 Good practice is to use useCallback when you pass functions as dependancies to useEffect
+
+### Progressbar
+
+- In order to show the user that the modal is on a timer (after 3 seconds the selected pic will disappear), you can set a progress bar
+- Go to the DeleteConfirmation component and use the builtin progress element just before the last closing div
+- You will obviously need state because a progress bar gets reset continuously. The more often you update it the smoother it will be. For this you can use another function built into the browser: setInterval(). It defines a function that will be executed every couple of milliseconds. You can pass the old state snapshot and the new remainning time which is that prevTime -10. Now you can set the value prop on the progress bar equal to remaining time. You also need to set a max prop so that the fill status can also be calculated by the browser
+
+```
+import { useEffect, useState } from "react";
+
+const TIMER = 3000;
+
+export default function DeleteConfirmation({ onConfirm, onCancel }) {
+  const [remainingTime, setRemainingTime] = useState(TIMER);
+
+  setInterval(() => {
+    setRemainingTime((prevTime) => prevTime - 10);
+  }, 10);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onConfirm();
+    }, 3000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [onConfirm]);
+
+  return (
+    <div id="delete-confirmation">
+      <h2>Are you sure?</h2>
+      <p>Do you really want to remove this place?</p>
+      <div id="confirmation-actions">
+        <button onClick={onCancel} className="button-text">
+          No
+        </button>
+        <button onClick={onConfirm} className="button">
+          Yes
+        </button>
+      </div>
+      <progress value={remainingTime} max={TIMER} />
+    </div>
+  );
+}
+```
+
+- However, at this stage the timer expires impromptu and three seconds later the pic deletes. This is because we have created an infite loop here. To prevent this we need to wrap the setInterval function with useEffect and the dependancies array.
+- The bar now works properly, but the interval keeps on repeating. So you need to return a cleanup function that will be executed by react and store a reference to this interval in a const or var. Now you can pass the clearInterval function into the function. clearInterval() is provided by the browser
+
+```
+useEffect(() => {
+    setInterval(() => {
+      console.log("INTERVAL");
+      setRemainingTime((prevTime) => prevTime - 10);
+    }, 10);
+  }, []);
+```
+
+Final code:
+
+```
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log("INTERVAL");
+      setRemainingTime((prevTime) => prevTime - 10);
+    }, 10);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+```
