@@ -335,4 +335,31 @@ export default function DeleteConfirmation({ onConfirm, onCancel }) {
 
 This will now remove the timer whenever the Modal is removed from the DOM
 
-- You will be warned to add the ohCoinfirm prop at this stage. However, the problem of the timer not stopping is now removed. Note that it does not run initially when the component runs the first time
+- You will be warned to add the onConfirm prop at this stage. However, the problem of the timer not stopping is now removed. Note that it does not run initially when the component runs the first time
+- When you run props or state values inside your useEffect function, you should add them as dependancies. So add onConfirm as a dependancy
+- When you add functions as dependancies there is a problem to anticipate, because it creates the danger of an infinite loop
+- Every time react rerenders a function it creates a new object (functions are concidered to be objects). Even if the two objects have precisely the same layout, it will concider it to be two separate values, therefore it will rerender everytime it compares the two and an infinite loop is created
+- The onConfirm prop is linked to the handleRemovePlace function which will recreate every time
+- In our project we dont have this problem because when a state update is triggered here with onConfirm it sets setModalIsOpen to false which results in the DeleteConfirmation to be removed from the DOM which includes the onConfirm prop
+- In the event of such a finite loop being produced (like when you temporarily disable or comment out setModalIsOpen in the App).
+- There is another hook that can deal with this problem and which can be used whether or whether not the element is removed from the DOM as we do here
+
+### useCallback is used to ensure that the function is not created all the time
+
+- In the handeRemovePlace function we have commented out the setModalIsOpen(false) state setting which means the function will result in a resetting of the setTimeout function in an infinite loop. To prevent this wrap the whole funcion inside a useCallback function.
+- Set it as a first argument to this useCallback function. It also takes a second argument that should be an array of dependancies
+- return the useCallback as a function that would not be recreated whenever the component function is executed again.
+- Any dependancies wrapped inside this useCallback function should be added into the array dependancy list of the useCallback
+
+```
+const handleRemovePlace = useCallback(function handleRemovePlace() {
+    setPickedPlaces((prevPickedPlaces) => prevPickedPlaces.filter((place) => place.id !== selectedPlace.current));
+
+    setModalIsOpen(false);
+
+    const storedIds = JSON.parse(localStorage.getItem("selectedPlaces") || "[]");
+    localStorage.setItem("selectedPlaces", JSON.stringify(storedIds.filter((id) => id !== selectedPlace.current)));
+  }, []);
+```
+
+Good practice is to use useCallback when you pass functions as dependancies to useEffect
