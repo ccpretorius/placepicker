@@ -274,3 +274,65 @@ In the App component, we can now set the handleStopRemovePlace function as a val
     onConfirm={handleRemovePlace}
   />
 </Modal>
+
+## Setting a timeout for the modal
+
+- setTimeout() is built into the browser. You want to set this in your DeleteConfrimation component
+- the first argument is a function and the second one is a duration in milliseconds
+- the function will be executed onece the duration expired
+  setTimeout(() => {
+  onConfirm();
+  }, 3000);
+  onConfirm will only be executed 3 seconds after the component is rendered
+- In this situation the setTimeout in DeleteConfirmation component is automatically rendered in the App component as well as the Modal which is rendered even though not visible in the DOM. So because it is part of the App component it will always render when the App renders for the first time
+- You can handle this by setting a condition like this in the App Component in the Modal when the Modal opens
+  <Modal open={modalIsOpen} onClose={handleStopRemovePlace}>
+  {modalIsOpen && <DeleteConfirmation onCancel={handleStopRemovePlace} onConfirm={handleRemovePlace} />}
+  </Modal>
+- The problem now is that if you select a picutre and escape from the modal, the timer remains activated and would still delete the picture as it keeps on going behind the scene after being activated by the first render.
+- Note that the setTimout() code is again a side effect as it is not directly related to the output of the jsx code.
+- So, how do one stop this code once the component disappears? The problem here is not setting the timer, but cleaning it up when the Modal function disappears. You can return a cleanup function from within the useEffect function for this purpose.
+  \_ So this is how the useEffect function looks with the setTimeout method inside the DeleteConfirmation component
+
+```
+export default function DeleteConfirmation({ onConfirm, onCancel }) {
+
+  useEffect(() => {
+  setTimeout(() => {
+    onConfirm();
+  }, 3000)},[]);
+
+  return (
+    <div id="delete-confirmation">
+      <h2>Are you sure?</h2>
+      <p>Do you really want to remove this place?</p>
+      <div id="confirmation-actions">
+        <button onClick={onCancel} className="button-text">
+          No
+        </button>
+        <button onClick={onConfirm} className="button">
+          Yes
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+- This is how you add the cleanup function:
+
+```
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onConfirm();
+    }, 3000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, []);
+```
+
+This will now remove the timer whenever the Modal is removed from the DOM
+
+- You will be warned to add the ohCoinfirm prop at this stage. However, the problem of the timer not stopping is now removed. Note that it does not run initially when the component runs the first time
